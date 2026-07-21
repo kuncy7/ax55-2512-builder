@@ -1,0 +1,35 @@
+# AX55 openwrt-25.12 builder — configuration.
+#
+# Purpose: clean-room CI verification of the AX55 v1 patch set exactly as a
+# downstream builder (eko.one.pl) consumes it: plain openwrt-25.12 + the
+# published patch + the published BDFs, nothing else. The workflow FAILS if
+# the resulting image lacks the DWMAC ethernet driver, so a silently-dropped
+# hunk can never produce a "successful" broken image again.
+
+# Upstream OpenWrt source (the tree that will be checked out and built).
+upstream:
+  repo: openwrt/openwrt
+  branch: openwrt-25.12
+
+# AX55 patch-set source. Tracked like a second upstream: a push to this repo
+# (new patch revision, new BDFs) triggers a rebuild just like an upstream bump.
+# The patch and both board files are fetched from here at build time.
+sources:
+  repo: kuncy7/openwrt-ax55-v1
+  branch: master
+  dir: src-2512
+
+# Device id. Must match a directory under devices/<id>/ containing
+#   - config        (the OpenWrt .config seed)
+#   - files/        (overlay rootfs, optional)
+device: tplink_archer-ax55-v1
+
+# Custom feeds appended to feeds.conf during build. None needed for this
+# device; the mechanism is kept for parity with the AW1000 builder.
+feeds: []
+
+# Release publishing settings.
+release:
+  prefix: ax55-2512              # tag = <prefix>-<UTC timestamp>-<run id>
+  keep: 3                        # number of newest releases to retain
+  artifact_retention_days: 7

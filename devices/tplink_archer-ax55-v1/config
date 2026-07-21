@@ -1,0 +1,13 @@
+# Seed config for TP-Link Archer AX55 v1 on openwrt-25.12.
+# `make defconfig` expands this to a full .config.
+CONFIG_TARGET_qualcommax=y
+CONFIG_TARGET_qualcommax_ipq50xx=y
+CONFIG_TARGET_qualcommax_ipq50xx_DEVICE_tplink_archer-ax55-v1=y
+
+# LuCI web interface (matches what downstream builds ship).
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-ssl=y
+
+# Small diagnostics that have proven useful on this board.
+CONFIG_PACKAGE_ethtool=y
+CONFIG_PACKAGE_tcpdump-mini=y
