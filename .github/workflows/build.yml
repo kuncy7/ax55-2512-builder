@@ -13,6 +13,9 @@ on:
       - 'common/**'
       - 'patches/**'
       - 'scripts/**'
+      # Tests never change what gets built; a full build for a test edit is
+      # hours of runner time for nothing. The Lint workflow still runs them.
+      - '!scripts/tests/**'
       - '.github/workflows/build.yml'
   schedule:
     - cron: "30 3 * * *"
