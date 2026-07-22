@@ -42,7 +42,9 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends shellcheck
-          shellcheck -x scripts/*.sh scripts/lib/*.sh scripts/tests/*.sh
+          mapfile -t files < <(find scripts -name '*.sh' | sort)
+          printf 'checking %s\n' "${files[@]}"
+          shellcheck -x "${files[@]}"
 
   yamllint:
     name: yamllint
@@ -58,8 +60,8 @@ jobs:
           yamllint -d "{extends: default, rules: {line-length: disable, document-start: disable, truthy: {check-keys: false}}}" \
             builder.yml .github/workflows/
 
-  prune-tests:
-    name: prune-releases tests
+  tests:
+    name: script tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -67,4 +69,11 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq
       - name: Run tests
-        run: bash scripts/tests/prune-releases.test.sh
+        run: |
+          set -euo pipefail
+          mapfile -t tests < <(find scripts/tests -name '*.test.sh' | sort)
+          [[ ${#tests[@]} -gt 0 ]] || { echo "::error::no tests found under scripts/tests"; exit 1; }
+          for t in "${tests[@]}"; do
+            echo "== $t"
+            bash "$t"
+          done
