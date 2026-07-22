@@ -1,0 +1,10 @@
+# Config fragment for the "all-kmods" guard build, appended to the device
+# config before `make defconfig`.
+#
+# Selecting every kernel module is what downstream builders that ship a full
+# package repository do (eko.one.pl among them). It pulls in kmod-ptp, which
+# makes CONFIG_PTP_1588_CLOCK modular, and that is enough to silently demote
+# STMMAC_ETH / STMMAC_PLATFORM / DWMAC_IPQ5018 from =y to =m unless
+# config-default pins PTP_1588_CLOCK=y. The guard job builds the kernel with
+# this fragment and asserts the symbols are still built-in.
+CONFIG_ALL_KMODS=y

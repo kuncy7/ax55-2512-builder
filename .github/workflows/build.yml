@@ -96,6 +96,76 @@ jobs:
             echo "sources_sha=$sources_sha"
           } >>"$GITHUB_OUTPUT"
 
+  # Guard against a class of failure the main build cannot see: our config
+  # symbols are correct for OUR configuration, but a downstream builder that
+  # selects every kernel module (eko.one.pl does) drags CONFIG_PTP_1588_CLOCK
+  # to =m, and kconfig then quietly demotes STMMAC_ETH and DWMAC_IPQ5018 with
+  # it. The image still builds and boots, with no eth0. This job reproduces
+  # that configuration and only builds far enough to inspect the kernel
+  # config; it deliberately does not produce or publish an image.
+  guard-all-kmods:
+    name: Guard - kernel config under ALL_KMODS
+    needs: [config, check-updates]
+    if: needs.check-updates.outputs.build_required == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      MAIN_SHA: ${{ needs.check-updates.outputs.main_sha }}
+      SOURCES_SHA: ${{ needs.check-updates.outputs.sources_sha }}
+      SOURCES_REPO: ${{ needs.config.outputs.sources_repo }}
+      SOURCES_DIR: ${{ needs.config.outputs.sources_dir }}
+      DEVICE_DIR: ${{ needs.config.outputs.device_dir }}
+      FEEDS_LINES: ${{ needs.config.outputs.feeds_lines }}
+    steps:
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git \
+            libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget
+
+      - name: Checkout OpenWrt source
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ needs.config.outputs.upstream_repo }}
+          ref: ${{ env.MAIN_SHA }}
+          fetch-depth: 0
+          path: openwrt
+
+      - name: Checkout builder repo
+        uses: actions/checkout@v6
+        with:
+          path: builder
+
+      - name: Prepare build environment (with ALL_KMODS)
+        env:
+          OPENWRT_DIR: ${{ github.workspace }}/openwrt
+          BUILDER_REPO: ${{ github.workspace }}/builder
+          CONFIG_FRAGMENT: config.all-kmods
+        run: bash builder/scripts/prepare-build.sh
+
+      - name: Confirm the fragment took effect
+        working-directory: openwrt
+        run: |
+          set -euo pipefail
+          grep -q '^CONFIG_ALL_KMODS=y' .config \
+            || { echo "::error::CONFIG_ALL_KMODS=y did not survive defconfig - guard would be meaningless"; exit 1; }
+          echo "CONFIG_ALL_KMODS=y present"
+
+      - name: Build the kernel only
+        working-directory: openwrt
+        run: |
+          set -euo pipefail
+          for attempt in 1 2; do
+            make -j"$(nproc)" target/linux/compile && exit 0
+            echo "::warning::kernel build attempt $attempt failed; retrying"
+          done
+          make -j1 V=s target/linux/compile
+
+      - name: Verify kernel config symbols
+        run: bash builder/scripts/check-kernel-config.sh openwrt | tee -a "$GITHUB_STEP_SUMMARY"
+
   build:
     name: Build firmware
     needs: [config, check-updates]
@@ -178,15 +248,7 @@ jobs:
           fi
 
       - name: Verify kernel config symbols
-        working-directory: openwrt
-        run: |
-          set -euo pipefail
-          cfg=$(ls build_dir/target-*/linux-qualcommax_ipq50xx/linux-*/.config | head -1)
-          echo "kernel config: $cfg"
-          for sym in CONFIG_DWMAC_IPQ5018=y CONFIG_STMMAC_ETH=y CONFIG_PCS_QCA_UNIPHY=y; do
-            grep -q "^$sym" "$cfg" || { echo "::error::missing $sym in built kernel config"; exit 1; }
-            echo "  OK: $sym"
-          done
+        run: bash builder/scripts/check-kernel-config.sh openwrt | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Verify image (DWMAC driver present)
         run: |

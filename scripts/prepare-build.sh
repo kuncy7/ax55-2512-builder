@@ -103,6 +103,16 @@ log::info "Installing packages from feeds"
 # 7. Device .config and resolve.
 log::info "Loading device config: $DEVICE_DIR/config"
 cp "$BUILDER_REPO/$DEVICE_DIR/config" .config
+
+# Optional fragment appended on top of the device config, used by the guard
+# build to reproduce a downstream configuration (see devices/*/config.*).
+if [[ -n "${CONFIG_FRAGMENT:-}" ]]; then
+  frag="$BUILDER_REPO/$DEVICE_DIR/$CONFIG_FRAGMENT"
+  [[ -f "$frag" ]] || log::die "CONFIG_FRAGMENT=$CONFIG_FRAGMENT not found at $frag"
+  log::info "Appending config fragment: $CONFIG_FRAGMENT"
+  cat "$frag" >>.config
+fi
+
 make defconfig
 
 # Assert defconfig kept the device profile (a wrong symbol name silently
