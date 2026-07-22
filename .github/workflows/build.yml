@@ -156,15 +156,25 @@ jobs:
             || { echo "::error::CONFIG_ALL_KMODS=y did not survive defconfig - guard would be meaningless"; exit 1; }
           echo "CONFIG_ALL_KMODS=y present"
 
+      # target/linux/compile does not pull in its own prerequisites when it is
+      # invoked directly from the top level: without a toolchain in staging_dir
+      # it dies in seconds with a bare "target/linux failed to build". Build
+      # tools and toolchain explicitly first.
+      - name: Build tools and toolchain
+        working-directory: openwrt
+        run: |
+          set -euo pipefail
+          make -j"$(nproc)" tools/install
+          make -j"$(nproc)" toolchain/install
+
       - name: Build the kernel only
         working-directory: openwrt
         run: |
           set -euo pipefail
-          for attempt in 1 2; do
-            make -j"$(nproc)" target/linux/compile && exit 0
-            echo "::warning::kernel build attempt $attempt failed; retrying"
-          done
-          make -j1 V=s target/linux/compile
+          if ! make -j"$(nproc)" target/linux/compile; then
+            echo "::warning::kernel build failed; re-running single-threaded for diagnostics"
+            make -j1 V=s target/linux/compile
+          fi
 
       - name: Verify kernel config symbols
         run: bash builder/scripts/check-kernel-config.sh openwrt | tee -a "$GITHUB_STEP_SUMMARY"
