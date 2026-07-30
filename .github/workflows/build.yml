@@ -38,6 +38,7 @@ jobs:
       sources_repo: ${{ steps.cfg.outputs.sources_repo }}
       sources_branch: ${{ steps.cfg.outputs.sources_branch }}
       sources_dir: ${{ steps.cfg.outputs.sources_dir }}
+      sources_patch: ${{ steps.cfg.outputs.sources_patch }}
       device: ${{ steps.cfg.outputs.device }}
       device_dir: ${{ steps.cfg.outputs.device_dir }}
       release_prefix: ${{ steps.cfg.outputs.release_prefix }}
@@ -145,6 +146,7 @@ jobs:
         env:
           OPENWRT_DIR: ${{ github.workspace }}/openwrt
           BUILDER_REPO: ${{ github.workspace }}/builder
+          SOURCES_PATCH: ${{ needs.config.outputs.sources_patch }}
           CONFIG_FRAGMENT: config.all-kmods
         run: bash builder/scripts/prepare-build.sh
 
@@ -227,6 +229,7 @@ jobs:
         env:
           OPENWRT_DIR: ${{ github.workspace }}/openwrt
           BUILDER_REPO: ${{ github.workspace }}/builder
+          SOURCES_PATCH: ${{ needs.config.outputs.sources_patch }}
         run: bash builder/scripts/prepare-build.sh
 
       - name: Set reproducible-build env
@@ -288,7 +291,7 @@ jobs:
           echo "release_tag=$tag_name" >>"$GITHUB_OUTPUT"
 
           {
-            echo "## OpenWrt 25.12 AX55 v1 build"
+            echo "## OpenWrt AX55 v1 build"
             echo "- **Date**: $date"
             echo "- **Device**: \`${DEVICE}\`"
             echo "- **Upstream**: \`${MAIN_SHA}\`"

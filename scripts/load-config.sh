@@ -9,7 +9,7 @@
 #
 # Outputs (when GITHUB_OUTPUT is set):
 #   upstream_repo, upstream_branch
-#   sources_repo, sources_branch, sources_dir
+#   sources_repo, sources_branch, sources_dir, sources_patch
 #   device, device_dir
 #   feeds_lines           (newline-separated `src-git <name> <url>` lines)
 #   release_prefix, release_keep, artifact_retention_days
@@ -29,6 +29,11 @@ upstream_branch="$(yq -r '.upstream.branch' "$BUILDER_YML")"
 sources_repo="$(yq -r '.sources.repo' "$BUILDER_YML")"
 sources_branch="$(yq -r '.sources.branch' "$BUILDER_YML")"
 sources_dir="$(yq -r '.sources.dir' "$BUILDER_YML")"
+sources_patch="$(yq -r '.sources.patch // "full"' "$BUILDER_YML")"
+case "$sources_patch" in
+  full|none) ;;
+  *) log::die "sources.patch must be 'full' or 'none' (got: $sources_patch)" ;;
+esac
 device="$(yq -r '.device' "$BUILDER_YML")"
 release_prefix="$(yq -r '.release.prefix' "$BUILDER_YML")"
 release_keep="$(yq -r '.release.keep' "$BUILDER_YML")"
@@ -43,7 +48,7 @@ device_dir="devices/$device"
 feeds_lines="$(yq -r '.feeds[] | "src-git " + .name + " " + .url' "$BUILDER_YML" 2>/dev/null || true)"
 
 log::info "upstream:    $upstream_repo@$upstream_branch"
-log::info "sources:     $sources_repo@$sources_branch ($sources_dir)"
+log::info "sources:     $sources_repo@$sources_branch ($sources_dir, patch=$sources_patch)"
 log::info "device:      $device  ($device_dir)"
 log::info "release:     prefix=$release_prefix keep=$release_keep retention=${artifact_retention_days}d"
 
@@ -54,6 +59,7 @@ if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
     echo "sources_repo=$sources_repo"
     echo "sources_branch=$sources_branch"
     echo "sources_dir=$sources_dir"
+    echo "sources_patch=$sources_patch"
     echo "device=$device"
     echo "device_dir=$device_dir"
     echo "release_prefix=$release_prefix"

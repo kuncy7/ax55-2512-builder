@@ -35,7 +35,9 @@ COMMON_FILES="${COMMON_FILES:-$BUILDER_REPO/common/files}"
 
 cd "$OPENWRT_DIR"
 
-# 1. Fetch the published AX55 patch set (exactly what a downstream builder gets).
+# 1. Fetch the published AX55 patch set (exactly what a downstream builder
+#    gets). In branch mode (SOURCES_PATCH=none) the upstream branch already
+#    carries the AX55 support, so only the BDFs are fetched.
 srcbase="https://raw.githubusercontent.com/${SOURCES_REPO}/${SOURCES_SHA}/${SOURCES_DIR}"
 fetch() {
   local name="$1" out="$2"
@@ -43,17 +45,22 @@ fetch() {
   curl -fsSL --retry 3 -o "$out" "$srcbase/$name"
 }
 
-log::info "Fetching AX55 patch set from ${SOURCES_REPO}@${SOURCES_SHA}/${SOURCES_DIR}"
 tmp="$(mktemp -d)"
-fetch "ax55-v1-openwrt-2512-full.patch" "$tmp/full.patch"
 fetch "board-tplink_ax55v1.ipq5018"     "$tmp/board-tplink_ax55v1.ipq5018"
 fetch "board-tplink_ax55v1.qcn6122"     "$tmp/board-tplink_ax55v1.qcn6122"
 
-# 2. Apply the patch. git apply is atomic: if any hunk does not apply the
-#    whole run fails here, loudly, instead of building a broken image.
-log::info "Applying ax55-v1-openwrt-2512-full.patch (git apply --check first)"
-git apply --check "$tmp/full.patch"
-git apply "$tmp/full.patch"
+if [[ "${SOURCES_PATCH:-full}" == "none" ]]; then
+  log::info "sources.patch=none: skipping full.patch (AX55 support comes from the upstream branch)"
+else
+  log::info "Fetching AX55 patch set from ${SOURCES_REPO}@${SOURCES_SHA}/${SOURCES_DIR}"
+  fetch "ax55-v1-openwrt-2512-full.patch" "$tmp/full.patch"
+
+  # 2. Apply the patch. git apply is atomic: if any hunk does not apply the
+  #    whole run fails here, loudly, instead of building a broken image.
+  log::info "Applying ax55-v1-openwrt-2512-full.patch (git apply --check first)"
+  git apply --check "$tmp/full.patch"
+  git apply "$tmp/full.patch"
+fi
 
 # 3. Board data files.
 log::info "Installing BDFs into package/firmware/ipq-wifi/files/"
@@ -119,6 +126,12 @@ make defconfig
 # falls back to the first device in the target list).
 grep -q '^CONFIG_TARGET_qualcommax_ipq50xx_DEVICE_tplink_archer-ax55-v1=y' .config \
   || log::die "device profile lost after defconfig (check devices/*/config symbol names)"
+
+# Until ethernet is proven on a given image, WiFi is the only access path to
+# this board. defconfig silently demotes the BDF package to =m when the
+# package would build empty (BDFs missing), so pin it and fail loudly.
+grep -q '^CONFIG_PACKAGE_ipq-wifi-tplink_ax55v1=y' .config \
+  || log::die "ipq-wifi-tplink_ax55v1 not built-in after defconfig (BDFs missing?)"
 
 # 8. Overlay files (common first, then device-specific so device wins).
 log::info "Applying overlay files"

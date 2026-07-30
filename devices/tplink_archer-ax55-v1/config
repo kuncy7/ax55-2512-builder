@@ -1,8 +1,17 @@
-# Seed config for TP-Link Archer AX55 v1 on openwrt-25.12.
+# Seed config for TP-Link Archer AX55 v1.
 # `make defconfig` expands this to a full .config.
 CONFIG_TARGET_qualcommax=y
 CONFIG_TARGET_qualcommax_ipq50xx=y
 CONFIG_TARGET_qualcommax_ipq50xx_DEVICE_tplink_archer-ax55-v1=y
+
+# Testing kernel (6.18). This is what the current branch-mode build is
+# verifying: the CMN PLL / SNAND / rtl8365mb fix stack lives in
+# patches-6.18, which only gets exercised with the testing kernel.
+CONFIG_TESTING_KERNEL=y
+
+# WiFi is the only access path to the board until ethernet is proven on a
+# given image; keep the BDF package built-in (prepare-build.sh asserts it).
+CONFIG_PACKAGE_ipq-wifi-tplink_ax55v1=y
 
 # LuCI web interface (matches what downstream builds ship).
 CONFIG_PACKAGE_luci=y
