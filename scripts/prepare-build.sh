@@ -72,12 +72,25 @@ md5sum package/firmware/ipq-wifi/files/board-tplink_ax55v1.*
 # 4. Fail fast if the ethernet symbols did not land where the kernel build
 #    will read them. This is the exact failure mode seen downstream: image
 #    builds fine, but without stmmac/DWMAC the switch has no conduit.
-log::info "Asserting ethernet symbols in ipq50xx/config-default"
+#    Layouts differ: the 25.12 patch set puts the symbols in the ipq50xx
+#    subtarget config-default, the openwrt-main branch keeps some (PCS) in
+#    the shared per-kernel qualcommax configs — accept either, but a shared
+#    config only counts if EVERY kernel version has the symbol, so a 6.18
+#    regression cannot hide behind a healthy 6.12 line. The built kernel
+#    .config is verified again after the build by check-kernel-config.sh.
+log::info "Asserting ethernet symbols in the target kernel configs"
 for sym in CONFIG_DWMAC_IPQ5018=y CONFIG_STMMAC_ETH=y CONFIG_PCS_QCA_UNIPHY=y; do
-  grep -q "^$sym" target/linux/qualcommax/ipq50xx/config-default \
-    || log::die "missing $sym in ipq50xx/config-default after patching"
+  if grep -q "^$sym" target/linux/qualcommax/ipq50xx/config-default; then
+    continue
+  fi
+  in_all=1
+  for cfg in target/linux/qualcommax/config-*; do
+    grep -q "^$sym" "$cfg" || in_all=0
+  done
+  [[ "$in_all" == 1 ]] \
+    || log::die "missing $sym in ipq50xx/config-default and not present in every qualcommax config-*"
 done
-log::info "  OK: DWMAC/STMMAC/PCS present in config-default"
+log::info "  OK: DWMAC/STMMAC/PCS present in the target kernel configs"
 
 # 5. Local patches (builder-specific extras, e.g. an overclock experiment).
 patches_dir="$BUILDER_REPO/patches"
