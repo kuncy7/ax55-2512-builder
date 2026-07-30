@@ -111,7 +111,10 @@ if [[ -n "${FEEDS_LINES:-}" ]]; then
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     log::info "  $line"
-    echo "$line" >>feeds.conf
+    # Idempotent: a plain append duplicates every custom feed when the
+    # script is re-run over an existing tree (adopted from Julius's
+    # Qualcommax_NSS_Builder).
+    grep -qxF "$line" feeds.conf || echo "$line" >>feeds.conf
   done <<<"$FEEDS_LINES"
 fi
 
@@ -145,6 +148,26 @@ grep -q '^CONFIG_TARGET_qualcommax_ipq50xx_DEVICE_tplink_archer-ax55-v1=y' .conf
 # package would build empty (BDFs missing), so pin it and fail loudly.
 grep -q '^CONFIG_PACKAGE_ipq-wifi-tplink_ax55v1=y' .config \
   || log::die "ipq-wifi-tplink_ax55v1 not built-in after defconfig (BDFs missing?)"
+
+# Generic sweep over everything the seed (and fragment) requested: kconfig
+# silently drops a symbol whose dependencies are unmet, and a build that
+# quietly leaves a package out is worse than one that stops. Only
+# requested-on symbols are asserted - a requested "=n" legitimately comes
+# back on when another selected package depends on it. (Adopted from
+# Julius's Qualcommax_NSS_Builder.)
+log::info "Verifying defconfig kept the requested symbols"
+seed_files=("$BUILDER_REPO/$DEVICE_DIR/config")
+[[ -n "${CONFIG_FRAGMENT:-}" ]] && seed_files+=("$BUILDER_REPO/$DEVICE_DIR/$CONFIG_FRAGMENT")
+dropped=()
+while IFS= read -r req; do
+  grep -qxF "$req" .config || dropped+=("$req")
+done < <(cat "${seed_files[@]}" | grep -E '^CONFIG_[A-Za-z0-9_-]+=' | grep -vE '=n$')
+
+if ((${#dropped[@]})); then
+  log::error "defconfig dropped ${#dropped[@]} requested symbol(s):"
+  printf '  %s\n' "${dropped[@]}" >&2
+  log::die "add the missing dependency or remove the line - do not ship a silently reduced image"
+fi
 
 # 8. Overlay files (common first, then device-specific so device wins).
 log::info "Applying overlay files"
