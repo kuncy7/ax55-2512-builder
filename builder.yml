@@ -18,7 +18,7 @@
 # rtl8365mb reset wait).
 upstream:
   repo: kuncy7/openwrt-nss-edma
-  branch: ax55-618-clean
+  branch: ax55-618-rebase
 
 # AX55 sources repo. In branch mode only the two BDFs are fetched from here
 # (they are not part of the upstream ipq-wifi feed yet — see PR #143 on the
