@@ -3,26 +3,36 @@ name: Build
 # All build/release/cleanup behavior reads its configuration from builder.yml.
 # The cron schedule below is the only knob that cannot be expressed there
 # (GitHub Actions cron values must be static strings in this file).
+# This repository is private, so runner minutes come out of a quota: one full
+# run costs ~135 of them (a ~70 min firmware build plus a ~70 min guard that
+# compiles the kernel a second time). The triggers below are deliberately
+# narrow - see also the `if:` on the guard job.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
+      # Only things that change what lands in the image. Edits to scripts/
+      # are covered by the Lint workflow (shellcheck + unit tests) and by the
+      # next scheduled run; a full build for a script tweak is ~135 runner
+      # minutes for nothing.
       - builder.yml
       - 'devices/**'
       - 'common/**'
       - 'patches/**'
-      - 'scripts/**'
-      # Tests never change what gets built; a full build for a test edit is
-      # hours of runner time for nothing. The Lint workflow still runs them.
-      - '!scripts/tests/**'
       - '.github/workflows/build.yml'
   schedule:
+    # Nightly. Cheap by design: `check-updates` compares the upstream and
+    # sources SHAs against the newest release and skips in seconds when
+    # nothing moved. Since `upstream` points at our own fork branch, this is
+    # also the ONLY automatic trigger that notices a push to that branch -
+    # pushing there does not touch this repository.
     - cron: "30 3 * * *"
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: false
+  # A superseded run can only produce a stale image; stop it burning minutes.
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -107,10 +117,19 @@ jobs:
   # it. The image still builds and boots, with no eth0. This job reproduces
   # that configuration and only builds far enough to inspect the kernel
   # config; it deliberately does not produce or publish an image.
+  #
+  # It compiles the kernel a second time, so it doubles the cost of a run.
+  # What it guards against only changes when the SOURCE changes (kernel
+  # config, patches, device config) - not when a builder script is edited.
+  # So it is skipped for pushes to this repository and runs on the scheduled
+  # source-change builds, plus on demand via "Run workflow". After editing
+  # devices/*/config, dispatch a run manually rather than waiting a day.
   guard-all-kmods:
     name: Guard - kernel config under ALL_KMODS
     needs: [config, check-updates]
-    if: needs.check-updates.outputs.build_required == 'true'
+    if: >-
+      needs.check-updates.outputs.build_required == 'true' &&
+      github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
@@ -303,7 +322,7 @@ jobs:
           mapfile -t assets < <(find openwrt/bin/targets/qualcommax/ipq50xx/ -type f -not -path "*/packages/*")
           gh release create "$tag_name" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "AX55 25.12 build $date" \
+            --title "AX55 v1 build $date" \
             --notes-file release_notes.md \
             "${assets[@]}"
 
