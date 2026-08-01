@@ -1,33 +1,25 @@
-# AX55 builder — configuration.
+# AX55 builder — configuration, branch `2512`.
 #
-# Purpose: clean-room CI verification of the AX55 v1 port. Two modes, both
-# proven on this device:
-#   - patch mode (sources.patch: full, the default): plain upstream branch
-#     + the published full patch + BDFs — exactly as a downstream builder
-#     (eko.one.pl) consumes the patch set;
-#   - branch mode (sources.patch: none): the upstream repo/branch below
-#     already contains the AX55 support (a PR branch on our fork); only the
-#     BDFs are fetched from the sources repo.
-# Either way the workflow FAILS if the resulting image lacks the DWMAC
-# ethernet driver or the AX55 BDF package, so a silently-dropped hunk can
-# never produce a "successful" broken image again.
+# This branch is the PATCH-MODE configuration: plain openwrt-25.12 + the
+# published full patch + BDFs, exactly as the downstream nightly builder
+# (eko.one.pl) consumes the patch set. It exists to clean-room-verify
+# src-2512/ax55-v1-openwrt-2512-full.patch after every revision of it.
+#
+# Run it manually: Actions -> Build -> Run workflow -> branch `2512`.
+# (push/schedule triggers stay on `main`, which tracks the 6.18 branch.)
 
 # Upstream OpenWrt source (the tree that will be checked out and built).
-# Currently: our openwrt fork, PR-shaped branch with the AX55 port on
-# openwrt main + kernel 6.18 fixes (CMN PLL bus clocks, SNAND SET_FEATURE,
-# rtl8365mb reset wait).
 upstream:
-  repo: kuncy7/openwrt-nss-edma
-  branch: ax55-618-rebase
+  repo: openwrt/openwrt
+  branch: openwrt-25.12
 
-# AX55 sources repo. In branch mode only the two BDFs are fetched from here
-# (they are not part of the upstream ipq-wifi feed yet — see PR #143 on the
-# ax55-bdf fork). A push here still triggers a rebuild.
+# AX55 patch-set source: the full patch and both board files are fetched
+# from here at build time and applied with git apply (atomic).
 sources:
   repo: kuncy7/openwrt-ax55-v1
   branch: master
   dir: src-2512
-  patch: none
+  patch: full
 
 # Device id. Must match a directory under devices/<id>/ containing
 #   - config        (the OpenWrt .config seed)
@@ -40,6 +32,6 @@ feeds: []
 
 # Release publishing settings.
 release:
-  prefix: ax55-618               # tag = <prefix>-<UTC timestamp>-<run id>
+  prefix: ax55-2512              # tag = <prefix>-<UTC timestamp>-<run id>
   keep: 3                        # number of newest releases to retain
   artifact_retention_days: 7
