@@ -19,3 +19,19 @@ CONFIG_PACKAGE_luci-ssl=y
 # Small diagnostics that have proven useful on this board.
 CONFIG_PACKAGE_ethtool=y
 CONFIG_PACKAGE_tcpdump-mini=y
+
+# USB storage + filesystems, matching the eko.one.pl image set, so a boot
+# with a stick inserted exercises the same code path (sd probe, block
+# hotplug, mounts) - needed to verify the 0923 SS fix and the LAN-degraded-
+# when-booted-with-a-stick report on 6.12. usbutils/hdparm for the
+# enumeration-speed and throughput proof.
+CONFIG_PACKAGE_kmod-usb-storage=y
+CONFIG_PACKAGE_kmod-usb-storage-uas=y
+CONFIG_PACKAGE_block-mount=y
+CONFIG_PACKAGE_kmod-fs-ext4=y
+CONFIG_PACKAGE_kmod-fs-vfat=y
+CONFIG_PACKAGE_kmod-fs-exfat=y
+CONFIG_PACKAGE_kmod-fs-ntfs3=y
+CONFIG_PACKAGE_ksmbd-server=y
+CONFIG_PACKAGE_usbutils=y
+CONFIG_PACKAGE_hdparm=y
