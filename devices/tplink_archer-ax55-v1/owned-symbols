@@ -1,0 +1,21 @@
+# Kconfig symbols introduced by OUR patches in target/linux/qualcommax/patches-*.
+#
+# Those patches apply to every subtarget of qualcommax, so each symbol has to
+# be answered in the SHARED config-<version>, not only in ipq50xx/config-default.
+# Otherwise a build of ipq807x/ipq60xx meets a new, visible, unanswered symbol
+# during syncconfig, kconfig turns interactive and dies on EOF. Our own CI only
+# builds ipq50xx and cannot see it - this list is how we catch it anyway.
+#
+# The shared entry is "# CONFIG_X is not set"; ipq50xx/config-default overrides
+# it to =y where the symbol is actually wanted.
+#
+# Note this only bites symbols with no unmet dependency: upstream's
+# REGULATOR_CPR3_NPU and friends are unanswered for ipq50xx too, but they are
+# invisible there, so kconfig never asks. Ours have no depends and are always
+# visible - hence this list, rather than a blanket scan of every patch.
+#
+# Add a line here whenever a patch of ours introduces a new symbol.
+
+PCS_QCA_UNIPHY
+DWMAC_IPQ5018
+PHY_QCOM_IPQ5018_USB_SS

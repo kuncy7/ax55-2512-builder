@@ -251,6 +251,17 @@ jobs:
           SOURCES_PATCH: ${{ needs.config.outputs.sources_patch }}
         run: bash builder/scripts/prepare-build.sh
 
+      # Costs seconds and covers what this builder structurally cannot: our
+      # patches add Kconfig symbols to the whole qualcommax target, but we only
+      # ever build ipq50xx, so an unanswered symbol breaks sibling subtargets
+      # for downstream builders and never for us. Runs before the long build so
+      # it fails in the first minute rather than the seventieth.
+      - name: Verify owned Kconfig symbols cover sibling subtargets
+        run: |
+          bash builder/scripts/check-target-symbols.sh \
+            openwrt "builder/${{ needs.config.outputs.device_dir }}/owned-symbols" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Set reproducible-build env
         working-directory: openwrt
         run: |
