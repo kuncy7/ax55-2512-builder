@@ -1,7 +1,17 @@
-# AX55 builder — configuration.
+# AX55 builder — configuration, branch `dtest3-rtl8367d`.
 #
-# Purpose: clean-room CI verification of the AX55 v1 port. Two modes, both
-# proven on this device:
+# TEST BRANCH. Identical to `main` (branch mode on ax55-618-rebase) plus one
+# local patch: namiltd's RTL8367S-VB / family-D series v4 from
+# namiltd/openwrt#134, added as target/linux/generic/pending-6.18/944-*.
+# Purpose: build it in a clean environment and hand a RAM-only initramfs to
+# the two forum users who actually own family-D hardware (the series cannot
+# be finished without it). Releases are tagged `ax55-618-dtest3-*` so they
+# never collide with the nightly `ax55-618-*` ones.
+# Run it manually: Actions -> Build -> Run workflow -> branch
+# `dtest3-rtl8367d`. Push/schedule triggers stay on `main`.
+#
+# Purpose of the builder itself: clean-room CI verification of the AX55 v1
+# port. Two modes, both proven on this device:
 #   - patch mode (sources.patch: full, the default): plain upstream branch
 #     + the published full patch + BDFs — exactly as a downstream builder
 #     (eko.one.pl) consumes the patch set;
@@ -40,6 +50,6 @@ feeds: []
 
 # Release publishing settings.
 release:
-  prefix: ax55-618               # tag = <prefix>-<UTC timestamp>-<run id>
+  prefix: ax55-618-dtest3        # tag = <prefix>-<UTC timestamp>-<run id>
   keep: 3                        # number of newest releases to retain
   artifact_retention_days: 7
