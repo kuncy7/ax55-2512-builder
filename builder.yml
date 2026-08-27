@@ -1,8 +1,12 @@
 # AX55 builder — configuration, branch `dtest3-rtl8367d`.
 #
 # TEST BRANCH. Identical to `main` (branch mode on ax55-618-rebase) plus one
-# local patch: namiltd's RTL8367S-VB / family-D series v4 from
-# namiltd/openwrt#134, added as target/linux/generic/pending-6.18/944-*.
+# local patch: namiltd's RTL8367S-VB / family-D series from
+# namiltd/openwrt#134, added as target/linux/generic/pending-6.18/930-*.
+# Numbering follows his: 944-* is now taken in backport-6.18 by the
+# devm_mutex_init cleanups. Since 2026-08-27 the series also carries the
+# SDS13 PCS patch (SGMII/HSGMII incl. 2500BASEX), so this build can be
+# expected to do more than just name the chip.
 # Purpose: build it in a clean environment and hand a RAM-only initramfs to
 # the two forum users who actually own family-D hardware (the series cannot
 # be finished without it). Releases are tagged `ax55-618-dtest3-*` so they
