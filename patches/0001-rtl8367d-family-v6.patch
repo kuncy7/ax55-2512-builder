@@ -1,50 +1,53 @@
-From 1b396d12378eaf2c799442e4cc31652a0681a158 Mon Sep 17 00:00:00 2001
+From a23bcabe90435ccb228620fbd80e5051c2ac8cfa Mon Sep 17 00:00:00 2001
 From: Stanislaw Pal <kuncy7@gmail.com>
-Date: Thu, 27 Aug 2026 18:54:29 +0200
+Date: Fri, 28 Aug 2026 12:28:26 +0200
 Subject: [PATCH] generic: rtl8365mb: namiltd's RTL8367S-VB (family D) series,
- PR #134
+ PR #19644
 
-Local copy of the family-D series from namiltd/openwrt#134, head
-a6301b8f690406c37ecc4f18ff70ab52f25a1789 (2026-08-27).
+Local copy of the family-D series at commit cc4e2b217, which is now the
+head of BOTH namiltd/openwrt#134 and openwrt/openwrt#19644 - the work
+moved into the upstream-facing PR and the patch files were renamed to the
+descriptive form.
 
-Changes since the previous drop (v4, six patches numbered 944-*):
-  - renumbered 944-* -> 930-*, because 944-01..04 in backport-6.18 are
-    now taken by the devm_mutex_init cleanups that landed upstream;
-  - new 930-7: net: dsa: realtek: add family D SDS13 PCS support -
-    SGMII/HSGMII PCS for the CPU-facing SerDes, including
-    PHY_INTERFACE_MODE_2500BASEX, which is what the AX55 trunk uses.
+Change since the 2026-08-27 drop, and it looks like the fix for what the
+tester saw: the family-D SerDes tuning table is now written through the
+SDS13 indirect window (new rtl8365mb_sds_write_index() plus
+RTL8365MB_D_SDS_EXT0_INDEX = 13) instead of index 0. Previously the mode
+bits reached the right register while the tuning went to the wrong
+SerDes, which matches the report of a 2.5G link that negotiates but
+passes no traffic.
 
-Verified with target/linux/prepare on the builder's own upstream base
-(ax55-618-rebase @785c2661d6, kernel 6.18.39, CONFIG_TESTING_KERNEL=y):
-EXIT 0, all seven applied, family-D chip entry and SDS13 PCS present in
-the prepared source.
+Verified with target/linux/prepare against the builder's own upstream
+base (ax55-618-rebase @785c2661d6, kernel 6.18.39, TESTING_KERNEL=y):
+EXIT 0, all seven applied, RTL8367S-VB/0x6642 and the SDS13 index present
+in the prepared source.
 ---
- .../generic/pending-6.18/930-1-rtl8367d.patch | 121 +++++++++++
- .../generic/pending-6.18/930-2-rtl8367d.patch | 125 +++++++++++
- .../generic/pending-6.18/930-3-rtl8367d.patch |  53 +++++
- .../generic/pending-6.18/930-4-rtl8367d.patch |  72 +++++++
- .../generic/pending-6.18/930-5-rtl8367d.patch |  52 +++++
- .../generic/pending-6.18/930-6-rtl8367d.patch | 137 ++++++++++++
- .../generic/pending-6.18/930-7-rtl8367d.patch | 198 ++++++++++++++++++
- 7 files changed, 758 insertions(+)
- create mode 100644 target/linux/generic/pending-6.18/930-1-rtl8367d.patch
- create mode 100644 target/linux/generic/pending-6.18/930-2-rtl8367d.patch
- create mode 100644 target/linux/generic/pending-6.18/930-3-rtl8367d.patch
- create mode 100644 target/linux/generic/pending-6.18/930-4-rtl8367d.patch
- create mode 100644 target/linux/generic/pending-6.18/930-5-rtl8367d.patch
- create mode 100644 target/linux/generic/pending-6.18/930-6-rtl8367d.patch
- create mode 100644 target/linux/generic/pending-6.18/930-7-rtl8367d.patch
+ ...realtek-rtl8365mb-detect-RTL8367S-VB.patch | 121 ++++++++
+ ...tek-rtl8365mb-set-speed-for-family-D.patch | 131 +++++++++
+ ...ltek-rtl8365mb-get-pvid-for-family-D.patch |  53 ++++
+ ...et-RGMII-mode-for-rtl8367d-family-ch.patch |  72 +++++
+ ...-and-get-vlan-4k-for-rtl8367d-family.patch |  52 ++++
+ ...tl8365mb-set-clear-pvid-for-family-D.patch | 179 ++++++++++++
+ ...365mb-add-family-D-SDS13-PCS-support.patch | 258 ++++++++++++++++++
+ 7 files changed, 866 insertions(+)
+ create mode 100644 target/linux/generic/pending-6.18/930-1-net-dsa-realtek-rtl8365mb-detect-RTL8367S-VB.patch
+ create mode 100644 target/linux/generic/pending-6.18/930-2-net-dsa-realtek-rtl8365mb-set-speed-for-family-D.patch
+ create mode 100644 target/linux/generic/pending-6.18/930-3-net-dsa-realtek-rtl8365mb-get-pvid-for-family-D.patch
+ create mode 100644 target/linux/generic/pending-6.18/930-4-net-dsa-realtek-rtl8365mb-set-RGMII-mode-for-rtl8367d-family-ch.patch
+ create mode 100644 target/linux/generic/pending-6.18/930-5-net-dsa-realtek-rtl8365mb-set-and-get-vlan-4k-for-rtl8367d-family.patch
+ create mode 100644 target/linux/generic/pending-6.18/930-6-net-dsa-realtek-rtl8365mb-set-clear-pvid-for-family-D.patch
+ create mode 100644 target/linux/generic/pending-6.18/930-7-net-dsa-realtek-rtl8365mb-add-family-D-SDS13-PCS-support.patch
 
-diff --git a/target/linux/generic/pending-6.18/930-1-rtl8367d.patch b/target/linux/generic/pending-6.18/930-1-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-1-net-dsa-realtek-rtl8365mb-detect-RTL8367S-VB.patch b/target/linux/generic/pending-6.18/930-1-net-dsa-realtek-rtl8365mb-detect-RTL8367S-VB.patch
 new file mode 100644
-index 0000000..51f99c4
+index 0000000..e085971
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-1-rtl8367d.patch
++++ b/target/linux/generic/pending-6.18/930-1-net-dsa-realtek-rtl8365mb-detect-RTL8367S-VB.patch
 @@ -0,0 +1,121 @@
-+From 8595341f07e067dcfe64b753f1daa36b7aaeb2be Mon Sep 17 00:00:00 2001
++From 64ff4c9279bda18e736f531fa976620f147a3c45 Mon Sep 17 00:00:00 2001
 +From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +Date: Sat, 13 Jun 2026 00:19:37 +0200
-+Subject: [PATCH 1/6] realtek: detect RTL8367S-VB
++Subject: [PATCH 1/7] net: dsa: realtek: detect RTL8367S-VB
 +
 +Detect RTL8367S-VB and set family.
 +
@@ -162,16 +165,16 @@ index 0000000..51f99c4
 + int rtl8365mb_vlan_port_get_pvid(struct realtek_priv *priv, int port,
 + 				 u16 *pvid);
 + int
-diff --git a/target/linux/generic/pending-6.18/930-2-rtl8367d.patch b/target/linux/generic/pending-6.18/930-2-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-2-net-dsa-realtek-rtl8365mb-set-speed-for-family-D.patch b/target/linux/generic/pending-6.18/930-2-net-dsa-realtek-rtl8365mb-set-speed-for-family-D.patch
 new file mode 100644
-index 0000000..afe1b1c
+index 0000000..3ee2b40
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-2-rtl8367d.patch
-@@ -0,0 +1,125 @@
-+From 3f82f7752df1231a6954504d51e5a6cec50f4e2d Mon Sep 17 00:00:00 2001
++++ b/target/linux/generic/pending-6.18/930-2-net-dsa-realtek-rtl8365mb-set-speed-for-family-D.patch
+@@ -0,0 +1,131 @@
++From 39f81e0fd598265e1008d3e61ddff484d188d602 Mon Sep 17 00:00:00 2001
 +From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +Date: Wed, 22 Jul 2026 22:47:26 +0200
-+Subject: [PATCH 2/6] realtek: set speed for family D
++Subject: [PATCH 2/7] net: dsa: realtek: set speed for family D
 +
 +Set speed for family D.
 +
@@ -190,7 +193,7 @@ index 0000000..afe1b1c
 + 
 + /* External interface force configuration registers 0~2 */
 + #define RTL8365MB_DIGITAL_INTERFACE_FORCE_REG0		0x1310 /* EXT0 */
-+@@ -347,6 +348,22 @@
++@@ -347,6 +348,23 @@
 + #define   RTL8365MB_DIGITAL_INTERFACE_FORCE_DUPLEX_MASK		0x0004
 + #define   RTL8365MB_DIGITAL_INTERFACE_FORCE_SPEED_MASK		0x0003
 + 
@@ -209,16 +212,20 @@ index 0000000..afe1b1c
 ++		((_extint) == 0 ? RTL8365MB_D_DIGITAL_INTERFACE_FORCE_REG0_EN : \
 ++		 (_extint) == 1 ? RTL8365MB_D_DIGITAL_INTERFACE_FORCE_REG1_EN : \
 ++		 0x0)
+++#define RTL8365MB_D_DIGITAL_INTERFACE_FORCE_EN_ALL_MASK	0xffff
 ++
 + /* CPU port mask register - controls which ports are treated as CPU ports */
 + #define RTL8365MB_CPU_PORT_MASK_REG	0x1219
 + #define   RTL8365MB_CPU_PORT_MASK_MASK	0x07FF
-+@@ -1584,21 +1601,29 @@ static int rtl8365mb_ext_config_forcemod
-+ 	u32 r_link;
-+ 	int val;
-+ 	int ret;
++@@ -1577,6 +1595,7 @@ static int rtl8365mb_ext_config_forcemod
++ {
++ 	const struct rtl8365mb_extint *extint =
++ 		rtl8365mb_get_port_extint(priv, port);
 ++	enum rtl8365mb_family family;
-+ 
++ 	u32 r_tx_pause;
++ 	u32 r_rx_pause;
++ 	u32 r_duplex;
++@@ -1588,17 +1607,24 @@ static int rtl8365mb_ext_config_forcemod
 + 	if (!extint)
 + 		return -ENODEV;
 + 
@@ -248,7 +255,7 @@ index 0000000..afe1b1c
 + 			r_speed = RTL8365MB_PORT_SPEED_1000M;
 + 		} else if (speed == SPEED_100) {
 + 			r_speed = RTL8365MB_PORT_SPEED_100M;
-+@@ -1628,8 +1653,7 @@ static int rtl8365mb_ext_config_forcemod
++@@ -1628,8 +1654,7 @@ static int rtl8365mb_ext_config_forcemod
 + 		r_duplex = 0;
 + 	}
 + 
@@ -258,12 +265,15 @@ index 0000000..afe1b1c
 + 			 r_tx_pause) |
 + 	      FIELD_PREP(RTL8365MB_DIGITAL_INTERFACE_FORCE_RXPAUSE_MASK,
 + 			 r_rx_pause) |
-+@@ -1637,11 +1661,30 @@ static int rtl8365mb_ext_config_forcemod
++@@ -1637,11 +1662,31 @@ static int rtl8365mb_ext_config_forcemod
 + 	      FIELD_PREP(RTL8365MB_DIGITAL_INTERFACE_FORCE_DUPLEX_MASK,
 + 			 r_duplex) |
 + 	      FIELD_PREP(RTL8365MB_DIGITAL_INTERFACE_FORCE_SPEED_MASK, r_speed);
 +-	ret = regmap_write(priv->map,
 +-			   RTL8365MB_DIGITAL_INTERFACE_FORCE_REG(extint->id),
++-			   val);
++-	if (ret)
++-		return ret;
 ++
 ++	if (family == RTL8365MB_FAMILY_C) {
 ++		val |= FIELD_PREP(RTL8365MB_DIGITAL_INTERFACE_FORCE_EN_MASK, 1);
@@ -273,36 +283,35 @@ index 0000000..afe1b1c
 ++		if (ret)
 ++			return ret;
 ++	} else {
-++		/* 2500M = 5 = 0b101; 5/(3 + 1) = 1 -> bit 12 set in SPEED2 */
+++		/* 3-bit speed: bits[1:0] -> FORCE_SPEED, bit[2] -> FORCE_SPEED2.
+++		 * 2500M = 0b101; 101 >> 2 = 1 placed into SPEED2 via division by 4. */
 ++		val |= FIELD_PREP(RTL8365MB_D_DIGITAL_INTERFACE_FORCE_SPEED2_MASK,
-++			   r_speed/(RTL8365MB_DIGITAL_INTERFACE_FORCE_SPEED_MASK + 1));
+++				  r_speed / (RTL8365MB_DIGITAL_INTERFACE_FORCE_SPEED_MASK + 1));
 ++		ret = regmap_write(priv->map,
-++			   RTL8365MB_D_DIGITAL_INTERFACE_FORCE_REG(extint->id),
-+ 			   val);
-+-	if (ret)
-+-		return ret;
+++				   RTL8365MB_D_DIGITAL_INTERFACE_FORCE_REG(extint->id),
+++				   val);
 ++		if (ret)
 ++			return ret;
 ++
 ++		ret = regmap_write(priv->map,
 ++				   RTL8365MB_D_DIGITAL_INTERFACE_FORCE_REG_EN(extint->id),
-++				   0xffff);
+++				   RTL8365MB_D_DIGITAL_INTERFACE_FORCE_EN_ALL_MASK);
 ++		if (ret)
 ++			return ret;
 ++	}
 + 
 + 	return 0;
 + }
-diff --git a/target/linux/generic/pending-6.18/930-3-rtl8367d.patch b/target/linux/generic/pending-6.18/930-3-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-3-net-dsa-realtek-rtl8365mb-get-pvid-for-family-D.patch b/target/linux/generic/pending-6.18/930-3-net-dsa-realtek-rtl8365mb-get-pvid-for-family-D.patch
 new file mode 100644
-index 0000000..cd33ee6
+index 0000000..7793836
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-3-rtl8367d.patch
++++ b/target/linux/generic/pending-6.18/930-3-net-dsa-realtek-rtl8365mb-get-pvid-for-family-D.patch
 @@ -0,0 +1,53 @@
-+From 5b003497aab98f05f2755ac0a5ef272fa5c99d69 Mon Sep 17 00:00:00 2001
++From 9c1335036a5c7f42e9b0009e2bfa5ad4795e33e7 Mon Sep 17 00:00:00 2001
 +From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +Date: Fri, 24 Jul 2026 03:09:09 +0200
-+Subject: [PATCH 3/6] realtek: get pvid for family D
++Subject: [PATCH 3/7] net: dsa: realtek: get pvid for family D
 +
 +Get pvid for family D chips.
 +
@@ -352,16 +361,16 @@ index 0000000..cd33ee6
 + 	return 0;
 + }
 + 
-diff --git a/target/linux/generic/pending-6.18/930-4-rtl8367d.patch b/target/linux/generic/pending-6.18/930-4-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-4-net-dsa-realtek-rtl8365mb-set-RGMII-mode-for-rtl8367d-family-ch.patch b/target/linux/generic/pending-6.18/930-4-net-dsa-realtek-rtl8365mb-set-RGMII-mode-for-rtl8367d-family-ch.patch
 new file mode 100644
-index 0000000..39f2541
+index 0000000..c5fa7aa
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-4-rtl8367d.patch
++++ b/target/linux/generic/pending-6.18/930-4-net-dsa-realtek-rtl8365mb-set-RGMII-mode-for-rtl8367d-family-ch.patch
 @@ -0,0 +1,72 @@
-+From 40cf854a5004678fb2c2e6ece89864f69d21fa3e Mon Sep 17 00:00:00 2001
++From 1d1349222b48fc6ee3967638daf4a1bf79897ae7 Mon Sep 17 00:00:00 2001
 +From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +Date: Fri, 24 Jul 2026 04:38:53 +0200
-+Subject: [PATCH 4/6] drivers: rtl8365mb: set RGMII mode for rtl8367d family
++Subject: [PATCH 4/7] net: dsa: realtek: set RGMII mode for rtl8367d family
 + chips
 +
 +Set RGMII mode for rtl8367d family chips
@@ -373,37 +382,37 @@ index 0000000..39f2541
 +
 +--- a/drivers/net/dsa/realtek/rtl8365mb_main.c
 ++++ b/drivers/net/dsa/realtek/rtl8365mb_main.c
-+@@ -444,6 +444,17 @@
++@@ -445,6 +445,17 @@
 + #define   RTL8365MB_PORT_MISC_CFG_VLAN_EGRESS_MODE_MASK		0x0030
 + #define   RTL8365MB_PORT_MISC_CFG_CONGESTION_SUSTAIN_TIME_MASK	0x000F
 + 
-++#define RTL8365MB_D_REG_EXT_TXC_DLY			0x13f9
-++#define RTL8365MB_D_EXT1_RGMII_TX_DLY_MASK			0x38
+++#define RTL8365MB_D_REG_EXT_TXC_DLY				0x13f9
+++#define   RTL8365MB_D_EXT1_RGMII_TX_DLY_MASK			0x38
 ++
 ++#define RTL8365MB_D_REG_TOP_CON0				0x1d70
-++#define  RTL8365MB_D_MAC7_SEL_EXT1_MASK			0x2000
-++#define  RTL8365MB_D_MAC4_SEL_EXT1_MASK			0x1000
+++#define   RTL8365MB_D_MAC7_SEL_EXT1_MASK			0x2000
+++#define   RTL8365MB_D_MAC4_SEL_EXT1_MASK			0x1000
 ++
 ++#define RTL8365MB_D_REG_SDS1_MISC0				0x1d78
-++#define  RTL8365MB_D_SDS1_MODE_MASK			0x1f
-++#define  RTL8365MB_D_PORT_SDS_MODE_DISABLE			0x1f
+++#define   RTL8365MB_D_SDS1_MODE_MASK				0x1f
+++#define   RTL8365MB_D_PORT_SDS_MODE_DISABLE			0x1f
 ++
 + /**
 +  * enum rtl8365mb_vlan_egress_mode - port VLAN egress mode
 +  * @RTL8365MB_VLAN_EGRESS_MODE_ORIGINAL: follow untag mask in VLAN4k table entry
 +@@ -1132,6 +1143,7 @@ static int rtl8365mb_ext_config_rgmii(st
++ 	struct dsa_port *dp;
 + 	int tx_delay = 0;
 + 	int rx_delay = 0;
-+ 	u32 val;
 ++	u32 data;
++ 	u32 val;
 + 	int ret;
 + 
-+ 	if (!extint)
-+@@ -1200,6 +1212,30 @@ static int rtl8365mb_ext_config_rgmii(st
++@@ -1201,6 +1213,30 @@ static int rtl8365mb_ext_config_rgmii(st
 + 	if (ret)
 + 		return ret;
 + 
-++	if ((rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D) && (extint->id == 1)) {
+++	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D && extint->id == 1) {
 ++		ret = regmap_update_bits(
 ++			priv->map, RTL8365MB_D_REG_EXT_TXC_DLY,
 ++			RTL8365MB_D_EXT1_RGMII_TX_DLY_MASK, 0);
@@ -430,16 +439,16 @@ index 0000000..39f2541
 + 	return 0;
 + }
 + 
-diff --git a/target/linux/generic/pending-6.18/930-5-rtl8367d.patch b/target/linux/generic/pending-6.18/930-5-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-5-net-dsa-realtek-rtl8365mb-set-and-get-vlan-4k-for-rtl8367d-family.patch b/target/linux/generic/pending-6.18/930-5-net-dsa-realtek-rtl8365mb-set-and-get-vlan-4k-for-rtl8367d-family.patch
 new file mode 100644
-index 0000000..d9432d5
+index 0000000..423bb4f
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-5-rtl8367d.patch
++++ b/target/linux/generic/pending-6.18/930-5-net-dsa-realtek-rtl8365mb-set-and-get-vlan-4k-for-rtl8367d-family.patch
 @@ -0,0 +1,52 @@
-+From b9827e4342f9f7c2d12bf45305bc6650afa84d5f Mon Sep 17 00:00:00 2001
++From 2190d3133a4dd6da3c770e40e0c1b085eeb05a83 Mon Sep 17 00:00:00 2001
 +From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +Date: Fri, 24 Jul 2026 05:35:45 +0200
-+Subject: [PATCH 5/6] kernel: set and get vlan 4k for rtl8367d family chips
++Subject: [PATCH 5/7] net: dsa: realtek: set and get vlan 4k for rtl8367d family chips
 +
 +Set and get vlan 4k for rtl8367d family chips
 +
@@ -459,28 +468,28 @@ index 0000000..d9432d5
 + /* RTL8367S supports 4k vlans (vid<=4095) and 32 enhanced vlans
 +  * for VIDs up to 8191
 +  */
-+@@ -214,7 +216,12 @@ static int rtl8365mb_vlan_4k_read(struct
++@@ -214,7 +216,11 @@ static int rtl8365mb_vlan_4k_read(struct
 + 	val = FIELD_GET(RTL8365MB_CVLAN_ENTRY_D2_UNTAG_EXT_MASK, data[2]);
 + 	vlan4k->untag |= FIELD_PREP(RTL8365MB_CVLAN_UNTAG_HI_MASK, val);
 + 
 +-	vlan4k->fid = FIELD_GET(RTL8365MB_CVLAN_ENTRY_D1_FID_MASK, data[1]);
 ++	val = data[1];
 ++	/* FID handling differs between families */
-++	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D) {
+++	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D)
 ++		val &= RTL8365MB_D_FID_MAX;
-++	}
 ++	vlan4k->fid = FIELD_GET(RTL8365MB_CVLAN_ENTRY_D1_FID_MASK, val);
 + 	vlan4k->priority_en =
 + 		FIELD_GET(RTL8365MB_CVLAN_ENTRY_D1_VBPEN_MASK, data[1]);
 + 	vlan4k->priority =
-+@@ -249,7 +256,13 @@ static int rtl8365mb_vlan_4k_write(struc
++@@ -249,7 +255,14 @@ static int rtl8365mb_vlan_4k_write(struc
 + 	val = FIELD_GET(RTL8365MB_CVLAN_UNTAG_LO_MASK, vlan4k->untag);
 + 	data[0] |= FIELD_PREP(RTL8365MB_CVLAN_ENTRY_D0_UNTAG_MASK, val);
 + 
 +-	data[1] |= FIELD_PREP(RTL8365MB_CVLAN_ENTRY_D1_FID_MASK, vlan4k->fid);
 ++	/* FID handling differs between families */
 ++	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D) {
-++		val = (vlan4k->fid & RTL8365MB_D_FID_MAX) | 12; /* ivl_svl - BIT(3), svlan_chek_ivl_svl - BIT(2) */
+++		/* ivl_svl - BIT(3), svlan_check_ivl_svl - BIT(2) */
+++		val = (vlan4k->fid & RTL8365MB_D_FID_MAX) | BIT(3) | BIT(2);
 ++	} else {
 ++		val = vlan4k->fid;
 ++	}
@@ -488,16 +497,16 @@ index 0000000..d9432d5
 + 	data[1] |= FIELD_PREP(RTL8365MB_CVLAN_ENTRY_D1_VBPEN_MASK,
 + 			      vlan4k->priority_en);
 + 	data[1] |= FIELD_PREP(RTL8365MB_CVLAN_ENTRY_D1_VBPRI_MASK,
-diff --git a/target/linux/generic/pending-6.18/930-6-rtl8367d.patch b/target/linux/generic/pending-6.18/930-6-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-6-net-dsa-realtek-rtl8365mb-set-clear-pvid-for-family-D.patch b/target/linux/generic/pending-6.18/930-6-net-dsa-realtek-rtl8365mb-set-clear-pvid-for-family-D.patch
 new file mode 100644
-index 0000000..3802072
+index 0000000..ae87d8d
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-6-rtl8367d.patch
-@@ -0,0 +1,137 @@
-+From 12640f3597d891f10523b753c92a20d7ffa5061c Mon Sep 17 00:00:00 2001
++++ b/target/linux/generic/pending-6.18/930-6-net-dsa-realtek-rtl8365mb-set-clear-pvid-for-family-D.patch
+@@ -0,0 +1,179 @@
++From fee4184756b5902a5f771e451692de8eb38d6699 Mon Sep 17 00:00:00 2001
 +From: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +Date: Fri, 24 Jul 2026 12:00:00 +0200
-+Subject: [PATCH 6/6] realtek: set/clear pvid for family D
++Subject: [PATCH 6/7] net: dsa: realtek: set/clear pvid for family D
 +
 +The RTL8367S-VB (family D) has no working VLAN member-config (MC)
 +table in hardware. rtl8365mb_vlan_port_get_pvid() was already fixed
@@ -514,12 +523,12 @@ index 0000000..3802072
 +
 +Signed-off-by: Mieczyslaw Nalewaj <namiltd@yahoo.com>
 +---
-+ drivers/net/dsa/realtek/rtl8365mb_vlan.c | 85 +++++++++++++++++++++++++++++
-+ 1 file changed, 85 insertions(+)
++ drivers/net/dsa/realtek/rtl8365mb_vlan.c | 84 ++++++++++++++++++++++++
++ 1 file changed, 84 insertions(+)
 +
 +--- a/drivers/net/dsa/realtek/rtl8365mb_vlan.c
 ++++ b/drivers/net/dsa/realtek/rtl8365mb_vlan.c
-+@@ -778,6 +778,35 @@ rtl8365mb_vlan_port_set_framefilter(stru
++@@ -778,6 +778,55 @@ rtl8365mb_vlan_port_set_framefilter(stru
 + }
 + 
 + /*
@@ -527,13 +536,26 @@ index 0000000..3802072
 ++ * VID written to its dedicated register, for chip families without a
 ++ * working VLAN MC table (RTL8365MB_FAMILY_D)
 ++ *
+++ * Reads back the previous PVID first so it can be restored if enabling
+++ * the new one via the frame filter register fails, matching the rollback
+++ * behavior of the family-C implementation above.
+++ *
 ++ * Context: Can sleep. Must be called with &priv->vlan_lock held.
 ++ * Return: 0 on success, or a negative error code on failure.
 ++ */
 ++static int rtl8365mb_vlan_pvid_port_set_direct(struct realtek_priv *priv,
-++						int port, u16 vid)
+++					       int port, u16 vid)
 ++{
+++	u32 prev_pvid;
 ++	int ret;
+++
+++	ret = regmap_read(priv->map, RTL8365MB_D_VLAN_PVID_CTRL_REG(port),
+++			  &prev_pvid);
+++	if (ret) {
+++		dev_err(priv->dev, "Failed to read current PVID\n");
+++		return ret;
+++	}
+++	prev_pvid &= RTL8365MB_D_VLAN_PVID_CTRL_MASK;
 ++
 ++	ret = regmap_write(priv->map, RTL8365MB_D_VLAN_PVID_CTRL_REG(port),
 ++			   vid & RTL8365MB_D_VLAN_PVID_CTRL_MASK);
@@ -545,9 +567,16 @@ index 0000000..3802072
 ++	/* Changing accept frame is what enables PVID (if not enabled before) */
 ++	ret = rtl8365mb_vlan_port_set_framefilter(priv, port,
 ++						  RTL8365MB_FRAME_TYPE_ANY_FRAME);
-++	if (ret)
+++	if (ret) {
 ++		dev_err(priv->dev, "Failed to set port frame filter\n");
+++		goto undo_pvid_write;
+++	}
 ++
+++	return 0;
+++
+++undo_pvid_write:
+++	(void)regmap_write(priv->map, RTL8365MB_D_VLAN_PVID_CTRL_REG(port),
+++			   prev_pvid);
 ++	return ret;
 ++}
 ++
@@ -555,7 +584,7 @@ index 0000000..3802072
 +  * rtl8365mb_vlan_pvid_port_set() - Configure a port's PVID and associated
 +  * VLANMC entry
 +  * @ds: dsa switch instance
-+@@ -806,6 +835,13 @@ int rtl8365mb_vlan_pvid_port_set(struct
++@@ -806,6 +855,13 @@ int rtl8365mb_vlan_pvid_port_set(struct
 + 
 + 	lockdep_assert_held(&priv->vlan_lock);
 + 
@@ -569,13 +598,16 @@ index 0000000..3802072
 + 	/* Read the old PVID exclusively to undo in case of error */
 + 	ret = rtl8365mb_vlan_get_pvid_mc(priv, port, &prev_vlanmc_idx,
 + 					 &prev_vlanmc);
-+@@ -886,6 +922,51 @@ undo_vlan_mc_port_set:
++@@ -886,6 +942,73 @@ undo_vlan_mc_port_set:
 + }
 + 
 + /*
 ++ * rtl8365mb_vlan_pvid_port_clear_direct() - Remove a port's raw-VID PVID
 ++ * configuration, for chip families without a working VLAN MC table
 ++ * (RTL8365MB_FAMILY_D)
+++ *
+++ * Reads back the previous frame filter first so it can be restored if
+++ * clearing the PVID register fails.
 ++ *
 ++ * Context: Can sleep. Must be called with &priv->vlan_lock held.
 ++ * Return: 0 on success, or a negative error code on failure.
@@ -584,6 +616,8 @@ index 0000000..3802072
 ++						  int port, u16 vid)
 ++{
 ++	struct realtek_priv *priv = ds->priv;
+++	enum rtl8365mb_frame_ingress prev_accepted_frame;
+++	bool filtering;
 ++	u32 cur_pvid;
 ++	int ret;
 ++
@@ -598,10 +632,19 @@ index 0000000..3802072
 ++	if ((cur_pvid & RTL8365MB_D_VLAN_PVID_CTRL_MASK) != vid)
 ++		return 0;
 ++
+++	filtering = dsa_port_is_vlan_filtering(dsa_to_port(ds, port));
+++
 ++	/* Changing accept frame is what really removes PVID. But only do
 ++	 * that if we are filtering vlan
 ++	 */
-++	if (dsa_port_is_vlan_filtering(dsa_to_port(ds, port))) {
+++	if (filtering) {
+++		ret = rtl8365mb_vlan_port_get_framefilter(priv, port,
+++							  &prev_accepted_frame);
+++		if (ret) {
+++			dev_err(priv->dev, "Failed to get current framefilter\n");
+++			return ret;
+++		}
+++
 ++		ret = rtl8365mb_vlan_port_set_framefilter(
 ++			priv, port, RTL8365MB_FRAME_TYPE_TAGGED_ONLY);
 ++		if (ret) {
@@ -611,9 +654,17 @@ index 0000000..3802072
 ++	}
 ++
 ++	ret = regmap_write(priv->map, RTL8365MB_D_VLAN_PVID_CTRL_REG(port), 0);
-++	if (ret)
+++	if (ret) {
 ++		dev_err(priv->dev, "Failed to set port PVID to 0\n");
+++		goto undo_set_framefilter;
+++	}
 ++
+++	return 0;
+++
+++undo_set_framefilter:
+++	if (filtering)
+++		(void)rtl8365mb_vlan_port_set_framefilter(priv, port,
+++							  prev_accepted_frame);
 ++	return ret;
 ++}
 ++
@@ -621,7 +672,7 @@ index 0000000..3802072
 +  * rtl8365mb_vlan_pvid_port_clear() - Remove a port's PVID configuration
 +  * @ds: dsa switch instance
 +  * @port: port index
-+@@ -908,6 +989,9 @@ int rtl8365mb_vlan_pvid_port_clear(struc
++@@ -908,6 +1031,9 @@ int rtl8365mb_vlan_pvid_port_clear(struc
 + 
 + 	lockdep_assert_held(&priv->vlan_lock);
 + 
@@ -631,50 +682,45 @@ index 0000000..3802072
 + 	ret = rtl8365mb_vlan_get_pvid_mc(priv, port, &vlanmc_idx,
 + 					 &vlanmc);
 + 	if (ret) {
-diff --git a/target/linux/generic/pending-6.18/930-7-rtl8367d.patch b/target/linux/generic/pending-6.18/930-7-rtl8367d.patch
+diff --git a/target/linux/generic/pending-6.18/930-7-net-dsa-realtek-rtl8365mb-add-family-D-SDS13-PCS-support.patch b/target/linux/generic/pending-6.18/930-7-net-dsa-realtek-rtl8365mb-add-family-D-SDS13-PCS-support.patch
 new file mode 100644
-index 0000000..9755bf9
+index 0000000..adf9fc7
 --- /dev/null
-+++ b/target/linux/generic/pending-6.18/930-7-rtl8367d.patch
-@@ -0,0 +1,198 @@
++++ b/target/linux/generic/pending-6.18/930-7-net-dsa-realtek-rtl8365mb-add-family-D-SDS13-PCS-support.patch
+@@ -0,0 +1,258 @@
 +From c91d3c98ba91b3d559a9ab28635e1d7797570de0 Mon Sep 17 00:00:00 2001
 +From: Fabiano Tassotti <fabianotassotti@gmail.com>
 +Date: Mon, 17 Aug 2026 23:51:41 +0200
-+Subject: [PATCH] net: dsa: realtek: add family D SDS13 PCS support
++Subject: [PATCH 7/7] net: dsa: realtek: add family D SDS13 PCS support
 +
 +Extend the existing RTL8367S SGMII/HSGMII PCS implementation in this
-+driver for family D switches, whose CPU-facing SerDes (referred to as
-+"SDS13" in the vendor RTL8367D port API) is reached by redirecting the
-+shared, unindexed SDS_INDACS window through the MAC6_SEL_SDS0 bit in
-+RTL8365MB_SDS_MISC_REG, and whose SDS_MISC fields otherwise differ from
-+family C.
++driver for family D switches, whose CPU SerDes is reached through the
++indexed SDS13 window and whose SDS_MISC fields differ from family C.
 +
 +The register sequence and tuning tables are derived from the GPL-licensed
 +Realtek RTL8367D port API distributed in the Mercusys MR80X GPL release.
-+Keep the existing family C path and the existing rtl8365mb_sds_write()/
-+rtl8365mb_sds_read() helpers unchanged - family D reuses them as-is
-+after the MAC6_SEL_SDS0 redirect, rather than introducing an indexed
-+variant of the SDS_INDACS window. Select the new behavior from the
-+driver's chip-family metadata, making the implementation reusable by
++Keep the existing family C path unchanged and select the new behavior from
++the driver's chip-family metadata, making the implementation reusable by
 +other family D boards.
 +
 +Signed-off-by: Fabiano Tassotti <fabianotassotti@gmail.com>
 +---
-+ drivers/net/dsa/realtek/rtl8365mb_main.c | 114 ++++++++++++++++++++++-
-+ 1 file changed, 113 insertions(+), 1 deletion(-)
-+
 +--- a/drivers/net/dsa/realtek/rtl8365mb_main.c
 ++++ b/drivers/net/dsa/realtek/rtl8365mb_main.c
-+@@ -317,6 +317,22 @@
++@@ -269,6 +269,7 @@
++ #define   RTL8365MB_SDS_INDACS_CMD_BUSY_MASK	0x0100
++ #define   RTL8365MB_SDS_INDACS_CMD_RUN_MASK	0x0080
++ #define   RTL8365MB_SDS_INDACS_CMD_WR_MASK	0x0040
+++#define   RTL8365MB_SDS_INDACS_CMD_INDEX_MASK	GENMASK(5, 0)
++ #define RTL8365MB_SDS_INDACS_ADR_REG		0x6601
++ #define RTL8365MB_SDS_INDACS_DATA_REG		0x6602
++ 
++@@ -317,6 +318,18 @@
 + #define   RTL8365MB_SDS_OPTION_ARM_KEY		0x0249
 + #define RTL8365MB_SDS_OPTION_REG		0x13C1
 + 
-++/* Family D reaches its CPU-facing SerDes (called "SDS13" in the vendor
-++ * RTL8367D port API) through the same, unindexed SDS_INDACS window used
-++ * above. Setting MAC6_SEL_SDS0 here redirects that shared window to the
-++ * family-D SerDes instance instead of an index being passed to
-++ * rtl8365mb_sds_write()/rtl8365mb_sds_read() directly.
-++ */
+++/* Family D uses the SDS13 indirect window for its MAC6 SerDes. */
+++#define RTL8365MB_D_SDS_EXT0_INDEX			13
 ++#define RTL8365MB_D_FIBER_CFG2_REG			0x13E8
 ++#define   RTL8365MB_D_FIBER_CFG2_RX_DISABLE_MASK	GENMASK(7, 6)
 ++#define   RTL8365MB_D_FIBER_CFG2_RX_DISABLE_SDS0	BIT(6)
@@ -688,7 +734,7 @@ index 0000000..9755bf9
 + /* Embedded DW8051 microcontroller control registers. The microcontroller
 +  * can run firmware to manage the SerDes link, but this driver keeps it in
 +  * reset and disabled: phylink already performs the link management that
-+@@ -690,6 +706,21 @@ static const struct rtl8365mb_jam_tbl_en
++@@ -691,6 +704,21 @@ static const struct rtl8365mb_jam_tbl_en
 + 	{ 0x0424, 0xD810 }, { 0x0001, 0x0F80 }, { 0x002E, 0x83F2 },
 + };
 + 
@@ -710,7 +756,61 @@ index 0000000..9755bf9
 + enum rtl8365mb_phy_interface_mode {
 + 	RTL8365MB_PHY_INTERFACE_MODE_INVAL = 0,
 + 	RTL8365MB_PHY_INTERFACE_MODE_INTERNAL = BIT(0),
-+@@ -1310,6 +1341,14 @@ static int rtl8365mb_sds_probe_option(st
++@@ -1240,7 +1268,8 @@ static int rtl8365mb_ext_config_rgmii(st
++ 	return 0;
++ }
++ 
++-static int rtl8365mb_sds_write(struct realtek_priv *priv, u16 addr, u16 data)
+++static int rtl8365mb_sds_write_index(struct realtek_priv *priv, u8 index,
+++				     u16 addr, u16 data)
++ {
++ 	int ret;
++ 
++@@ -1258,10 +1287,18 @@ static int rtl8365mb_sds_write(struct re
++ 	 */
++ 	return regmap_write(priv->map, RTL8365MB_SDS_INDACS_CMD_REG,
++ 			    RTL8365MB_SDS_INDACS_CMD_RUN_MASK |
++-			    RTL8365MB_SDS_INDACS_CMD_WR_MASK);
+++			    RTL8365MB_SDS_INDACS_CMD_WR_MASK |
+++			    FIELD_PREP(RTL8365MB_SDS_INDACS_CMD_INDEX_MASK,
+++				       index));
++ }
++ 
++-static int rtl8365mb_sds_read(struct realtek_priv *priv, u16 addr, u16 *data)
+++static int rtl8365mb_sds_write(struct realtek_priv *priv, u16 addr, u16 data)
+++{
+++	return rtl8365mb_sds_write_index(priv, 0, addr, data);
+++}
+++
+++static int rtl8365mb_sds_read_index(struct realtek_priv *priv, u8 index,
+++				    u16 addr, u16 *data)
++ {
++ 	u32 val;
++ 	int ret;
++@@ -1271,7 +1308,9 @@ static int rtl8365mb_sds_read(struct rea
++ 		return ret;
++ 
++ 	ret = regmap_write(priv->map, RTL8365MB_SDS_INDACS_CMD_REG,
++-			   RTL8365MB_SDS_INDACS_CMD_RUN_MASK);
+++			   RTL8365MB_SDS_INDACS_CMD_RUN_MASK |
+++			   FIELD_PREP(RTL8365MB_SDS_INDACS_CMD_INDEX_MASK,
+++				      index));
++ 	if (ret)
++ 		return ret;
++ 
++@@ -1294,6 +1333,11 @@ static int rtl8365mb_sds_read(struct rea
++ 	return 0;
++ }
++ 
+++static int rtl8365mb_sds_read(struct realtek_priv *priv, u16 addr, u16 *data)
+++{
+++	return rtl8365mb_sds_read_index(priv, 0, addr, data);
+++}
+++
++ /* The vendor driver selects between two sets of SerDes tuning parameters based
++  * on the chip option register. Only the variant for a non-zero option has been
++  * tested on real hardware - the RTL8367S parts seen so far all report 1. The
++@@ -1311,6 +1355,14 @@ static int rtl8365mb_sds_probe_option(st
 + 	int ret;
 + 	int i;
 + 
@@ -725,17 +825,12 @@ index 0000000..9755bf9
 + 	/* Nothing to probe if no external interface is wired to the SerDes */
 + 	for (i = 0; i < RTL8365MB_MAX_NUM_EXTINTS; i++) {
 + 		extint = &mb->chip_info->extints[i];
-+@@ -1346,6 +1385,62 @@ static int rtl8365mb_sds_probe_option(st
++@@ -1347,6 +1399,52 @@ static int rtl8365mb_sds_probe_option(st
 + 	return 0;
 + }
 + 
-++/* RTL8367S-VB / family D SerDes PCS configuration. Redirects the shared,
-++ * unindexed SDS_INDACS window to the CPU-facing SerDes instance via
-++ * MAC6_SEL_SDS0 before applying the family-D tuning table, using the same
-++ * rtl8365mb_sds_write() helper as the family-C path below.
-++ */
 ++static int rtl8365mb_d_pcs_config(struct realtek_priv *priv,
-++			       phy_interface_t interface)
+++				  phy_interface_t interface)
 ++{
 ++	const struct rtl8365mb_jam_tbl_entry *sds_jam;
 ++	size_t sds_jam_size;
@@ -760,8 +855,8 @@ index 0000000..9755bf9
 ++		return ret;
 ++
 ++	for (i = 0; i < sds_jam_size; i++) {
-++		ret = rtl8365mb_sds_write(priv, sds_jam[i].reg,
-++					   sds_jam[i].val);
+++		ret = rtl8365mb_sds_write_index(priv, RTL8365MB_D_SDS_EXT0_INDEX,
+++						sds_jam[i].reg, sds_jam[i].val);
 ++		if (ret)
 ++			return ret;
 ++	}
@@ -772,23 +867,18 @@ index 0000000..9755bf9
 ++	if (ret)
 ++		return ret;
 ++
-++	ret = regmap_update_bits(priv->map, RTL8365MB_SDS_MISC_REG,
-++				 RTL8365MB_D_SDS_MISC_PA33PC_EN |
-++				 RTL8365MB_D_SDS_MISC_PA12PC_EN |
-++				 RTL8365MB_D_SDS_MISC_MODE_MASK,
-++				 RTL8365MB_D_SDS_MISC_PA33PC_EN |
-++				 RTL8365MB_D_SDS_MISC_PA12PC_EN | mode);
-++	if (!ret)
-++		dev_info(priv->dev, "family D SerDes %s configured\n",
-++			 phy_modes(interface));
-++
-++	return ret;
+++	return regmap_update_bits(priv->map, RTL8365MB_SDS_MISC_REG,
+++				  RTL8365MB_D_SDS_MISC_PA33PC_EN |
+++				  RTL8365MB_D_SDS_MISC_PA12PC_EN |
+++				  RTL8365MB_D_SDS_MISC_MODE_MASK,
+++				  RTL8365MB_D_SDS_MISC_PA33PC_EN |
+++				  RTL8365MB_D_SDS_MISC_PA12PC_EN | mode);
 ++}
 ++
 + /* The vendor driver raises the port 6 ingress and egress rate limiters to
 +  * their maximum in its switch init, unconditionally for the whole chip
 +  * family. The chip reset in rtl8365mb_setup() puts them back to their reset
-+@@ -1436,6 +1531,9 @@ static int rtl8365mb_pcs_config(struct p
++@@ -1437,6 +1535,9 @@ static int rtl8365mb_pcs_config(struct p
 + 	if (ret)
 + 		return ret;
 + 
@@ -798,7 +888,28 @@ index 0000000..9755bf9
 + 	/* Tune the SerDes with vendor-prescribed parameters */
 + 	for (i = 0; i < sds_jam_size; i++) {
 + 		ret = rtl8365mb_sds_write(priv, sds_jam[i].reg,
-+@@ -1542,6 +1640,13 @@ static void rtl8365mb_pcs_get_state(stru
++@@ -1521,6 +1622,7 @@ static void rtl8365mb_pcs_get_state(stru
++ {
++ 	struct rtl8365mb *mb = pcs_to_rtl8365mb(pcs);
++ 	struct realtek_priv *priv = mb->priv;
+++	u8 sds_index = 0;
++ 	u16 status;
++ 	u32 val;
++ 	int ret;
++@@ -1532,7 +1634,11 @@ static void rtl8365mb_pcs_get_state(stru
++ 	 * rtl8365mb_pcs_config()), so the link status register can be read
++ 	 * directly through the SDS_INDACS window without racing the auto-poll.
++ 	 */
++-	ret = rtl8365mb_sds_read(priv, RTL8365MB_SDS_REG_LINK_STATUS, &status);
+++	if (rtl8365mb_get_family(priv) == RTL8365MB_FAMILY_D)
+++		sds_index = RTL8365MB_D_SDS_EXT0_INDEX;
+++
+++	ret = rtl8365mb_sds_read_index(priv, sds_index,
+++				       RTL8365MB_SDS_REG_LINK_STATUS, &status);
++ 	if (ret) {
++ 		state->link = false;
++ 		return;
++@@ -1543,6 +1649,13 @@ static void rtl8365mb_pcs_get_state(stru
 + 	if (!state->link)
 + 		return;
 + 
@@ -812,7 +923,7 @@ index 0000000..9755bf9
 + 	/* The speed and duplex are forced; read them back from the values
 + 	 * programmed into the SerDes MISC register.
 + 	 */
-+@@ -1583,6 +1688,12 @@ static void rtl8365mb_pcs_link_up(struct
++@@ -1584,6 +1697,12 @@ static void rtl8365mb_pcs_link_up(struct
 + 	u32 r_speed;
 + 	int ret;
 + 
@@ -825,7 +936,7 @@ index 0000000..9755bf9
 + 	/* The speed field has no value for 2.5 Gbps: the rate is determined by
 + 	 * the HSGMII SerDes configuration, and the vendor driver programs the
 + 	 * 1 Gbps value here.
-+@@ -1897,7 +2008,8 @@ static void rtl8365mb_phylink_mac_link_u
++@@ -1899,7 +2018,8 @@ static void rtl8365mb_phylink_mac_link_u
 + 		 * rtl8365mb_pcs_link_up() because pcs_link_up() carries no
 + 		 * pause information.
 + 		 */

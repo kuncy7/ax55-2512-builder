@@ -2,7 +2,8 @@
 #
 # TEST BRANCH. Identical to `main` (branch mode on ax55-618-rebase) plus one
 # local patch: namiltd's RTL8367S-VB / family-D series from
-# namiltd/openwrt#134, added as target/linux/generic/pending-6.18/930-*.
+# openwrt/openwrt#19644 (== namiltd/openwrt#134, same head), added as
+# target/linux/generic/pending-6.18/930-*.
 # Numbering follows his: 944-* is now taken in backport-6.18 by the
 # devm_mutex_init cleanups. Since 2026-08-27 the series also carries the
 # SDS13 PCS patch (SGMII/HSGMII incl. 2500BASEX), so this build can be
